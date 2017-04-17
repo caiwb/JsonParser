@@ -1,6 +1,6 @@
 # coding:utf-8
 
-import string
+import string, JsonException
 
 class Stack:
 
@@ -30,8 +30,12 @@ class JsonParser:
 
     def load(self, s):
 
-        if not isinstance(s, str) or len(s) < 2 or s[0] != '{' or s[len(s) - 1] != '}':
-            raise Exception("this string is not a json string!")
+        leftBraceChar = '{'
+        rightBraceChar = '}'
+        blankChar = ' '
+        if not isinstance(s, str) or len(s) < 2 \
+                or s[0] != leftBraceChar or s[len(s) - 1] != rightBraceChar:
+            raise JsonException
             return
 
         stack = Stack()
@@ -52,18 +56,22 @@ class JsonParser:
         for c in s:
             list = stack.items
             o = ord(c)
-            if (c == '-' or c == '.' or ('0' <= c <= '9')) and strStart == -1:# 处理数字
+            minusChar = '-'
+            pointChar = '.'
+            zeroChar = '0'
+            nineChar = '9'
+            if (c == minusChar or c == pointChar or (zeroChar <= c <= nineChar)) and strStart == -1:# 处理数字
                 if numberStart == -1:
                     numberStart = loopCount
-                if c == '.':#小数
+                if c == '.':# 小数
                     isFloat = True
             else:
                 if numberStart != -1 and numberEnd == -1:
                     numberEnd = loopCount
                     if isFloat:
-                        number = string.atof(s[numberStart : numberEnd])
+                        number = string.atof(s[numberStart: numberEnd])
                     else:
-                        number = string.atoi(s[numberStart : numberEnd])
+                        number = string.atoi(s[numberStart: numberEnd])
                     stack.push(number)
                     number = 0
                     numberStart = -1
@@ -122,7 +130,7 @@ class JsonParser:
             self.data = stack.pop()
             # self.__convertStringToUnicode(None, None, self.data)
         else:
-            raise Exception("this string is not a json string!")
+            raise JsonException
 
     def dump(self):
         jsonStr = self.__convertDataToJson(self.data)
@@ -185,7 +193,7 @@ class JsonParser:
             file = open(f)
             jsonStr = file.read()
         except Exception as e:
-            raise ValueError(e)
+            raise IOError(e)
         finally:
             self.load(jsonStr)
             file.close()
