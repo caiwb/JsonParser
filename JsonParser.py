@@ -89,19 +89,19 @@ class JsonParser:
                 if numberStart != -1 and numberEnd == -1:
                     numberEnd = loopCount
                     try:
+                        numberStr = s[numberStart: numberEnd]
                         if isFloat:
                             if floatPointIndex != -1 and \
-                                    (s[floatPointIndex - 1] <= zeroChar
-                                     or s[floatPointIndex - 1] >= nineChar
-                                     or s[floatPointIndex + 1] <= zeroChar
-                                     or s[floatPointIndex + 1] >= nineChar):
+                                    (s[floatPointIndex - 1] < zeroChar
+                                     or s[floatPointIndex - 1] > nineChar
+                                     or s[floatPointIndex + 1] < zeroChar
+                                     or s[floatPointIndex + 1] > nineChar):
                                 raise TypeError("the float is not a standard "
                                                 "format for json")
-                            number = string.atof(s[numberStart: numberEnd])
+                            number = string.atof(numberStr)
                         else:
-
-                            number = string.atoi(s[numberStart: numberEnd])
-                    except Exception:
+                            number = string.atoi(numberStr)
+                    except Exception, e:
                             raise Exception("the number is not a standard "
                                             "format")
                     stack.push(number)
@@ -197,7 +197,6 @@ class JsonParser:
 
     def dump(self):
         jsonStr = self.__convertDataToJson(self.data)
-
         return jsonStr.encode("utf-8")
 
     def __convertDataToJson(self, obj):
@@ -208,6 +207,10 @@ class JsonParser:
         elif isinstance(obj, float):
             return '%f' % obj
         elif not obj:
+            if obj == {}:
+                return '{}'
+            if obj == []:
+                return '[]'
             return 'null'
         elif isinstance(obj, dict):
             s = '{'
@@ -246,17 +249,17 @@ class JsonParser:
         except Exception as e:
             raise ValueError(e)
         finally:
-            file.close()
+            fp.close()
 
     def loadJson(self, f):
         try:
-            with open(f, 'w') as fp:
+            with open(f, 'r') as fp:
                 jsonStr = fp.read()
         except Exception as e:
             raise IOError(e)
         finally:
             self.load(jsonStr)
-            file.close()
+            fp.close()
 
     def loadDict(self, d):
         if not isinstance(d, dict):
