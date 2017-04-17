@@ -45,33 +45,36 @@ class JsonParser:
         numberEnd = -1
         isFloat = False
         floatPointIndex = -1
+
+        #const
+        colonChar = ':'
+        blankChar = ' '
+        minusChar = '-'
+        pointChar = '.'
+        commaChar = ','
+        leftBraceChar = '{'
+        rightBraceChar = '}'
+        leftBracketChar = '['
+        rightBracketChar = ']'
+        doubleQuotationChar = '"'
+        doubleLineChar = '\\'
+        zeroChar = '0'
+        nineChar = '9'
+        eChar = 'e'
+        trueStr = 'true'
+        falseStr = 'false'
+        nullStr = 'null'
+
+        #other
         isTranfering = False
         inDoubleQuotation = False
+        legalChars = [colonChar, blankChar, '\n', '\t', '\r', '\0']
         loopCount = 0
+        inLeftBracketChar = False
 
         for c in s:
             list = stack.items
             o = ord(c)
-            minusChar = '-'
-            pointChar = '.'
-            commaChar = ','
-            leftBraceChar = '{'
-            rightBraceChar = '}'
-            leftBracketChar = '['
-            rightBracketChar = ']'
-            doubleQuotationChar = '"'
-            doubleLineChar = '\\'
-
-            zeroChar = '0'
-            nineChar = '9'
-
-            eChar = 'e'
-            tChar = 't'
-            trueStr = 'true'
-            fChar = 'f'
-            falseStr = 'false'
-            nChar = 'n'
-            nullStr = 'null'
 
             if (c == minusChar or c == pointChar or (zeroChar <= c <= nineChar)
                 or (c == eChar and numberStart != -1)) \
@@ -107,11 +110,15 @@ class JsonParser:
                     numberEnd = -1
                     isFloat = False
 
-                if (c == leftBraceChar or c == leftBracketChar
-                    or c == commaChar) \
-                        and strStart == -1 \
-                        and not isTranfering:
-                    # 处理{
+                if (c == leftBraceChar or c == commaChar) \
+                        and strStart == -1 and not isTranfering:
+                    # 处理{and,
+                    stack.push(c)
+
+                elif c == leftBracketChar \
+                        and strStart == -1 and not isTranfering:
+                    # 处理[
+                    inLeftBracketChar = True
                     stack.push(c)
 
                 elif c == doubleQuotationChar and not isTranfering:
@@ -127,15 +134,15 @@ class JsonParser:
                         strStart = -1
                         strEnd = -1
 
-                elif c == nChar and strStart == -1:  # 处理null
+                elif nullStr.find(c) != -1 and strStart == -1:  # 处理null
                     if s[loopCount: loopCount + 4] == nullStr:
                         stack.push(None)
 
-                elif c == tChar and strStart == -1:  # 处理true
+                elif trueStr.find(c) != -1 and strStart == -1:  # 处理true
                     if s[loopCount: loopCount + 4] == trueStr:
                         stack.push(True)
 
-                elif c == fChar and strStart == -1:  # 处理false
+                elif falseStr.find(c) != -1 and strStart == -1:  # 处理false
                     if s[loopCount: loopCount + 5] == falseStr:
                         stack.push(False)
 
@@ -158,9 +165,13 @@ class JsonParser:
 
                 elif c == rightBracketChar and strStart == -1 \
                         and not isTranfering: # 处理]
+                    inLeftBracketChar = False
                     result = []
                     while stack.top() != leftBracketChar and stack.size() > 0:
-                        result.insert(0, stack.pop())
+                        if stack.top() != commaChar:
+                            result.insert(0, stack.pop())
+                        else:
+                            raise TypeError("this string is not a json string")
                         if stack.top() == commaChar:
                             stack.pop()
                             continue
@@ -171,10 +182,13 @@ class JsonParser:
                 elif c == doubleLineChar or isTranfering: # 处理转义符
                     isTranfering = True if not isTranfering else False
 
-                elif inDoubleQuotation:
+                elif not inDoubleQuotation and c not in legalChars:
                     raise TypeError("this string is not a json string")
 
             loopCount += 1
+
+        if inLeftBracketChar:
+            raise TypeError("this string is not a json string")
 
         if stack.size() == 1:
             self.data = stack.pop()
