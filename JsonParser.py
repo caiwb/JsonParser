@@ -1,8 +1,6 @@
 # coding:utf-8
 
-import string
-
-import logging
+import string, copy
 
 
 class Stack:
@@ -23,7 +21,7 @@ class Stack:
         return len(self.items)
 
     def showItems(self):
-        print self.items
+        return self.items
 
 
 class JsonParser:
@@ -31,10 +29,6 @@ class JsonParser:
         self.data = {}
 
     def load(self, s):
-
-        leftBraceChar = '{'
-        rightBraceChar = '}'
-        blankChar = ' '
         if not isinstance(s, str) or len(s) < 2:
             raise TypeError("this string is not a json string")
 
@@ -51,7 +45,8 @@ class JsonParser:
         numberEnd = -1
         isFloat = False
         floatPointIndex = -1
-
+        isTranfering = False
+        inDoubleQuotation = False
         loopCount = 0
 
         for c in s:
@@ -59,37 +54,69 @@ class JsonParser:
             o = ord(c)
             minusChar = '-'
             pointChar = '.'
+            commaChar = ','
+            leftBraceChar = '{'
+            rightBraceChar = '}'
+            leftBracketChar = '['
+            rightBracketChar = ']'
+            doubleQuotationChar = '"'
+            doubleLineChar = '\\'
+
             zeroChar = '0'
             nineChar = '9'
-            if (c == minusChar or c == pointChar or (zeroChar <= c <= nineChar)) and strStart == -1:
+
+            eChar = 'e'
+            tChar = 't'
+            trueStr = 'true'
+            fChar = 'f'
+            falseStr = 'false'
+            nChar = 'n'
+            nullStr = 'null'
+
+            if (c == minusChar or c == pointChar or (zeroChar <= c <= nineChar)
+                or (c == eChar and numberStart != -1)) \
+                    and strStart == -1:
                 # 处理数字
                 if numberStart == -1:
                     numberStart = loopCount
-                if c == '.':  # 小数
+                if c == pointChar or c == eChar:  # 小数
                     isFloat = True
-                    floatPointIndex = loopCount
+                    floatPointIndex = loopCount if c == pointChar else -1
             else:
                 if numberStart != -1 and numberEnd == -1:
                     numberEnd = loopCount
-                    if isFloat:
-                        if s[floatPointIndex - 1] <= zeroChar or s[floatPointIndex - 1] >= nineChar \
-                                or s[floatPointIndex + 1] <= zeroChar \
-                                or s[floatPointIndex + 1] >= nineChar:
-                            raise TypeError("the float is not a standard format for json")
-                        number = string.atof(s[numberStart: numberEnd])
-                    else:
-                        number = string.atoi(s[numberStart: numberEnd])
+                    try:
+                        if isFloat:
+                            if floatPointIndex != -1 and \
+                                    (s[floatPointIndex - 1] <= zeroChar
+                                     or s[floatPointIndex - 1] >= nineChar
+                                     or s[floatPointIndex + 1] <= zeroChar
+                                     or s[floatPointIndex + 1] >= nineChar):
+                                raise TypeError("the float is not a standard "
+                                                "format for json")
+                            number = string.atof(s[numberStart: numberEnd])
+                        else:
+
+                            number = string.atoi(s[numberStart: numberEnd])
+                    except Exception:
+                            raise Exception("the number is not a standard "
+                                            "format")
                     stack.push(number)
                     number = 0
                     numberStart = -1
                     numberEnd = -1
                     isFloat = False
-                    # 处理数字end
 
-                if c == '{' or c == '[' or c == ',':
+                if (c == leftBraceChar or c == leftBracketChar
+                    or c == commaChar) \
+                        and strStart == -1 \
+                        and not isTranfering:
+                    # 处理{
                     stack.push(c)
 
-                elif c == '"':  # 处理字符串
+                elif c == doubleQuotationChar and not isTranfering:
+                    # 处理"
+                    inDoubleQuotation = True if not inDoubleQuotation else False
                     if strStart == -1:
                         strStart = loopCount + 1
                     else:
@@ -100,43 +127,52 @@ class JsonParser:
                         strStart = -1
                         strEnd = -1
 
-                elif c == 'n' and strStart == -1:  # 处理null
-                    if s[loopCount: loopCount + 4] == 'null':
+                elif c == nChar and strStart == -1:  # 处理null
+                    if s[loopCount: loopCount + 4] == nullStr:
                         stack.push(None)
 
-                elif c == 't' and strStart == -1:  # 处理true
-                    if s[loopCount: loopCount + 4] == 'true':
+                elif c == tChar and strStart == -1:  # 处理true
+                    if s[loopCount: loopCount + 4] == trueStr:
                         stack.push(True)
 
-                elif c == 't' and strStart == -1:  # 处理false
-                    if s[loopCount: loopCount + 4] == 'false':
+                elif c == fChar and strStart == -1:  # 处理false
+                    if s[loopCount: loopCount + 5] == falseStr:
                         stack.push(False)
 
-                elif c == '}':
+                elif c == rightBraceChar and strStart == -1 \
+                        and not isTranfering: # 处理}
                     result = {}
-                    while stack.top() != '{' and stack.size() > 2:
+                    while stack.top() != leftBraceChar and stack.size() > 2:
                         value = stack.pop()
                         key = stack.pop()
-                        if not isinstance(key, str) or len(key) < 1:
-                            raise TypeError("the key must be a instance of string")
+                        if not isinstance(key, str):
+                            raise TypeError("the key must be a instance of "
+                                            "string")
                         result.update({key: value})
-                        if stack.top() == ',':
+                        if stack.top() == commaChar:
                             stack.pop()
                             continue
-                    if stack.top() == '{':
+                    if stack.top() == leftBraceChar:
                         stack.pop()
                     stack.push(result)
 
-                elif c == ']':
+                elif c == rightBracketChar and strStart == -1 \
+                        and not isTranfering: # 处理]
                     result = []
-                    while stack.top() != '[' and stack.size() > 0:
+                    while stack.top() != leftBracketChar and stack.size() > 0:
                         result.insert(0, stack.pop())
-                        if stack.top() == ',':
+                        if stack.top() == commaChar:
                             stack.pop()
                             continue
-                    if stack.top() == '[':
+                    if stack.top() == leftBracketChar:
                         stack.pop()
                     stack.push(result)
+
+                elif c == doubleLineChar or isTranfering: # 处理转义符
+                    isTranfering = True if not isTranfering else False
+
+                elif inDoubleQuotation:
+                    raise TypeError("this string is not a json string")
 
             loopCount += 1
 
