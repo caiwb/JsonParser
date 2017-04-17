@@ -150,38 +150,38 @@ class JsonParser:
 
         return jsonStr.encode("utf-8")
 
-    def __convertDataToJson(self, object):
-        if isinstance(object, str) or isinstance(object, unicode):
-            return '"%s"' % object
-        elif isinstance(object, int):
-            return '%d' % object
-        elif isinstance(object, float):
-            return '%f' % object
-        elif not object:
+    def __convertDataToJson(self, obj):
+        if isinstance(obj, str) or isinstance(obj, unicode):
+            return '"%s"' % obj
+        elif isinstance(obj, int):
+            return '%d' % obj
+        elif isinstance(obj, float):
+            return '%f' % obj
+        elif not obj:
             return 'null'
-        elif isinstance(object, dict):
+        elif isinstance(obj, dict):
             s = '{'
             loopCount = 0
-            for key in object.keys():
+            for key in obj.keys():
                 if isinstance(key, str) or isinstance(key, unicode):
                     s += '"%s":' % key
                 elif isinstance(key, int):
                     s += '%d' % key
                 elif isinstance(key, float):
                     s += '%f' % key
-                s += self.__convertDataToJson(object[key])
-                if loopCount < len(object.keys()) - 1:
+                s += self.__convertDataToJson(obj[key])
+                if loopCount < len(obj.keys()) - 1:
                     s += ','
                 else:
                     s += '}'
                 loopCount += 1
             return s
-        elif isinstance(object, list):
+        elif isinstance(obj, list):
             s = '['
             loopCount = 0
-            for item in object:
+            for item in obj:
                 s += self.__convertDataToJson(item)
-                if loopCount < len(object) - 1:
+                if loopCount < len(obj) - 1:
                     s += ','
                 else:
                     s += ']'
@@ -189,13 +189,10 @@ class JsonParser:
             return s
 
     def dumpJson(self, f):
-        # jsonStr = str(self.data).encode("UTF-8")
-        # jsonStr = self.__checkJsonString(jsonStr)
         jsonStr = self.dump()
-
         try:
-            file = open(f, 'w')
-            file.write(jsonStr)
+            with open(f, 'w') as fp:
+                fp.write(jsonStr)
         except Exception as e:
             raise ValueError(e)
         finally:
@@ -203,8 +200,8 @@ class JsonParser:
 
     def loadJson(self, f):
         try:
-            file = open(f)
-            jsonStr = file.read()
+            with open(f, 'w') as fp:
+                jsonStr = fp.read()
         except Exception as e:
             raise IOError(e)
         finally:
@@ -213,8 +210,7 @@ class JsonParser:
 
     def loadDict(self, d):
         if not isinstance(d, dict):
-            raise Exception("param is not a dict!")
-            return
+            raise TypeError("param is not a dict!")
         self.data.update(d)
 
     def dumpDict(self):
@@ -222,7 +218,7 @@ class JsonParser:
         self.__convertStringToUnicode(None, None, dictUnicode)
         return dictUnicode
 
-    def __convertUnicodeToString(self, object, key, value):
+    def __convertUnicodeToString(self, obj, key, value):
         if isinstance(value, dict):
             for k in value.keys():
                 if isinstance(k, unicode):
@@ -233,13 +229,13 @@ class JsonParser:
                     self.__convertUnicodeToString(value, k, v)
 
         elif isinstance(value, unicode):
-            object[key] = value.encode("utf-8")
+            obj[key] = value.encode("utf-8")
 
         elif isinstance(value, list):
             for item in value:
-                self.__convertUnicodeToString(object, key, item)
+                self.__convertUnicodeToString(obj, key, item)
 
-    def __convertStringToUnicode(self, object, key, value):
+    def __convertStringToUnicode(self, obj, key, value):
         if isinstance(value, dict):
             for k in value.keys():
                 if isinstance(k, str):
@@ -250,16 +246,15 @@ class JsonParser:
                     self.__convertStringToUnicode(value, k, v)
 
         elif isinstance(value, str):
-            object[key] = value.decode("utf-8")
+            obj[key] = value.decode("utf-8")
 
         elif isinstance(value, list):
             for item in value:
-                self.__convertStringToUnicode(object, key, item)
+                self.__convertStringToUnicode(obj, key, item)
 
     def update(self, d):
         if not isinstance(d, dict):
-            raise Exception("param is not a dict!")
-            return
+            raise TypeError("param is not a dict!")
         self.data.update(d)
 
     def __getitem__(self, key):
