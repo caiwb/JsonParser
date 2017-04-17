@@ -1,9 +1,11 @@
 # coding:utf-8
 
-import string, JsonException
+import string
+
+import logging
+
 
 class Stack:
-
     def __init__(self):
         self.items = []
 
@@ -23,8 +25,8 @@ class Stack:
     def showItems(self):
         print self.items
 
-class JsonParser:
 
+class JsonParser:
     def __init__(self):
         self.data = {}
 
@@ -33,23 +35,22 @@ class JsonParser:
         leftBraceChar = '{'
         rightBraceChar = '}'
         blankChar = ' '
-        if not isinstance(s, str) or len(s) < 2 \
-                or s[0] != leftBraceChar or s[len(s) - 1] != rightBraceChar:
-            raise JsonException
-            return
+        if not isinstance(s, str) or len(s) < 2:
+            raise TypeError("this string is not a json string")
 
         stack = Stack()
 
-        #string
+        # string
         wordStr = ""
         strStart = -1
         strEnd = -1
 
-        #number
+        # number
         number = 0
         numberStart = -1
         numberEnd = -1
         isFloat = False
+        floatPointIndex = -1
 
         loopCount = 0
 
@@ -60,15 +61,21 @@ class JsonParser:
             pointChar = '.'
             zeroChar = '0'
             nineChar = '9'
-            if (c == minusChar or c == pointChar or (zeroChar <= c <= nineChar)) and strStart == -1:# 处理数字
+            if (c == minusChar or c == pointChar or (zeroChar <= c <= nineChar)) and strStart == -1:
+                # 处理数字
                 if numberStart == -1:
                     numberStart = loopCount
-                if c == '.':# 小数
+                if c == '.':  # 小数
                     isFloat = True
+                    floatPointIndex = loopCount
             else:
                 if numberStart != -1 and numberEnd == -1:
                     numberEnd = loopCount
                     if isFloat:
+                        if s[floatPointIndex - 1] <= zeroChar or s[floatPointIndex - 1] >= nineChar \
+                                or s[floatPointIndex + 1] <= zeroChar \
+                                or s[floatPointIndex + 1] >= nineChar:
+                            raise TypeError("the float is not a standard format for json")
                         number = string.atof(s[numberStart: numberEnd])
                     else:
                         number = string.atoi(s[numberStart: numberEnd])
@@ -76,32 +83,43 @@ class JsonParser:
                     number = 0
                     numberStart = -1
                     numberEnd = -1
-                    isFloat = False# 处理数字end
+                    isFloat = False
+                    # 处理数字end
 
-                if c == '{'or c == '[' or c == ',':
+                if c == '{' or c == '[' or c == ',':
                     stack.push(c)
 
-                elif c == '"':# 处理字符串
+                elif c == '"':  # 处理字符串
                     if strStart == -1:
                         strStart = loopCount + 1
                     else:
                         strEnd = loopCount
-                        wordStr = s[strStart : strEnd]
+                        wordStr = s[strStart: strEnd]
                         stack.push(wordStr)
                         wordStr = ""
                         strStart = -1
                         strEnd = -1
 
-                elif c == 'n' and strStart == -1:# 处理null
-                    if s[loopCount : loopCount + 4] == 'null':
+                elif c == 'n' and strStart == -1:  # 处理null
+                    if s[loopCount: loopCount + 4] == 'null':
                         stack.push(None)
+
+                elif c == 't' and strStart == -1:  # 处理true
+                    if s[loopCount: loopCount + 4] == 'true':
+                        stack.push(True)
+
+                elif c == 't' and strStart == -1:  # 处理false
+                    if s[loopCount: loopCount + 4] == 'false':
+                        stack.push(False)
 
                 elif c == '}':
                     result = {}
-                    while stack.top() != '{' and stack.size() > 1:
+                    while stack.top() != '{' and stack.size() > 2:
                         value = stack.pop()
                         key = stack.pop()
-                        result.update({key : value})
+                        if not isinstance(key, str) or len(key) < 1:
+                            raise TypeError("the key must be a instance of string")
+                        result.update({key: value})
                         if stack.top() == ',':
                             stack.pop()
                             continue
@@ -110,7 +128,6 @@ class JsonParser:
                     stack.push(result)
 
                 elif c == ']':
-                    # list = stack.items
                     result = []
                     while stack.top() != '[' and stack.size() > 0:
                         result.insert(0, stack.pop())
@@ -123,14 +140,10 @@ class JsonParser:
 
             loopCount += 1
 
-        # stack.showItems()
-        # i = stack.size()
-        # list = stack.items
         if stack.size() == 1:
             self.data = stack.pop()
-            # self.__convertStringToUnicode(None, None, self.data)
         else:
-            raise JsonException
+            raise TypeError("this string is not a json string")
 
     def dump(self):
         jsonStr = self.__convertDataToJson(self.data)
@@ -139,7 +152,7 @@ class JsonParser:
 
     def __convertDataToJson(self, object):
         if isinstance(object, str) or isinstance(object, unicode):
-            return '"%s"'% object
+            return '"%s"' % object
         elif isinstance(object, int):
             return '%d' % object
         elif isinstance(object, float):
@@ -151,11 +164,11 @@ class JsonParser:
             loopCount = 0
             for key in object.keys():
                 if isinstance(key, str) or isinstance(key, unicode):
-                    s += '"%s":'% key
+                    s += '"%s":' % key
                 elif isinstance(key, int):
-                    s += '%d'% key
+                    s += '%d' % key
                 elif isinstance(key, float):
-                    s += '%f'% key
+                    s += '%f' % key
                 s += self.__convertDataToJson(object[key])
                 if loopCount < len(object.keys()) - 1:
                     s += ','
@@ -184,7 +197,7 @@ class JsonParser:
             file = open(f, 'w')
             file.write(jsonStr)
         except Exception as e:
-                raise ValueError(e)
+            raise ValueError(e)
         finally:
             file.close()
 
@@ -256,14 +269,3 @@ class JsonParser:
         if not isinstance(key, str):
             return
         self.data.update({key: value})
-
-
-
-
-
-
-
-
-
-
-
